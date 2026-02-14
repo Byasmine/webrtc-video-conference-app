@@ -13,10 +13,13 @@ import { setupSignaling } from './signaling.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '5000', 10);
 
+// Normalize FRONTEND_URL: strip trailing slash (CORS requires exact origin match)
+const FRONTEND_URL = process.env.FRONTEND_URL?.replace(/\/+$/, '') || true;
+
 const app = express();
 const httpServer = createServer(app);
 
-app.use(cors({ origin: process.env.FRONTEND_URL || true, credentials: true }));
+app.use(cors({ origin: FRONTEND_URL, credentials: true }));
 app.use(express.json());
 
 const apiLimiter = rateLimit({
