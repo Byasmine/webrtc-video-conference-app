@@ -1,5 +1,7 @@
 # Video Conferencing Application
 
+![alt text](img.png)
+
 A WebRTC-based video conferencing platform similar to Google Meet, with authentication via Clerk and data persistence in PostgreSQL.
 
 ## Features
