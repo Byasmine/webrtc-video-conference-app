@@ -1,55 +1,15 @@
-/**
- * WebSocket Signaling Server for Video Conference Application
- * 
- * This module handles real-time communication for video conferencing using Socket.IO.
- * It manages:
- * - User authentication via Clerk
- * - Room joining with a lobby/approval system
- * - WebRTC signaling (offers, answers, ICE candidates)
- * - User management (kicking, accepting/rejecting join requests)
- * - Participant tracking and presence
- */
-
 import { Server } from 'socket.io';
 import { verifyToken } from '@clerk/backend';
 import { getRoom } from './db/index.js';
 
-/**
- * Lobby Map: Stores pending join requests for rooms
- * 
- * Structure: Map<roomId, Array<{socketId, userId, displayName}>>
- * 
- * When a non-owner user tries to join a room, they are added to the lobby
- * and must wait for the room owner to approve their request.
- */
 const lobby = new Map();
 
-/**
- * Extracts authentication token from socket handshake
- * 
- * Checks multiple possible locations for the token:
- * 1. auth.token (direct token property)
- * 2. auth.Authorization header (Bearer token format)
- * 
- * @param {Socket} socket - Socket.IO socket instance
- * @returns {string|null} - The authentication token or null if not found
- */
 function getToken(socket) {
   const auth = socket.handshake.auth;
   return auth?.token ?? auth?.Authorization?.replace?.(/^Bearer\s+/i, '') ?? null;
 }
 
-/**
- * Adds a user to the lobby (waiting room) for a specific room
- * 
- * Users are added to the lobby when they request to join a room but are not the owner.
- * The room owner will receive a notification and can approve or reject the request.
- * 
- * @param {string} roomId - The ID of the room
- * @param {string} socketId - The socket ID of the requesting user
- * @param {string} userId - The Clerk user ID
- * @param {string|null} displayName - Optional display name for the user
- */
+
 function addToLobby(roomId, socketId, userId, displayName) {
   // Initialize lobby array for room if it doesn't exist
   if (!lobby.has(roomId)) lobby.set(roomId, []);
@@ -60,19 +20,7 @@ function addToLobby(roomId, socketId, userId, displayName) {
   list.push({ socketId, userId, displayName });
 }
 
-/**
- * Removes a user from the lobby for a specific room
- * 
- * Called when:
- * - User's join request is accepted or rejected
- * - User disconnects while in lobby
- * - User is manually removed
- * 
- * Also cleans up empty lobby entries to prevent memory leaks.
- * 
- * @param {string} roomId - The ID of the room
- * @param {string} socketId - The socket ID to remove
- */
+
 function removeFromLobby(roomId, socketId) {
   const list = lobby.get(roomId);
   if (!list) return;
@@ -83,25 +31,12 @@ function removeFromLobby(roomId, socketId) {
   if (list.length === 0) lobby.delete(roomId);
 }
 
-/**
- * Retrieves all pending join requests for a specific room
- * 
- * @param {string} roomId - The ID of the room
- * @returns {Array} - Array of pending user objects {socketId, userId, displayName}
- */
+
 function getPendingForRoom(roomId) {
   return lobby.get(roomId) || [];
 }
 
-/**
- * Sets up and configures the Socket.IO signaling server
- * 
- * This function initializes the WebSocket server, sets up authentication middleware,
- * and registers all event handlers for room management and WebRTC signaling.
- * 
- * @param {http.Server} httpServer - HTTP server instance to attach Socket.IO to
- * @returns {Server} - Configured Socket.IO server instance
- */
+
 export function setupSignaling(httpServer) {
   // Normalize FRONTEND_URL: strip trailing slash (CORS requires exact origin match)
   const frontendOrigin = process.env.FRONTEND_URL?.replace(/\/+$/, '') || '*';
@@ -114,14 +49,7 @@ export function setupSignaling(httpServer) {
     },
   });
 
-  /**
-   * Authentication Middleware
-   * 
-   * Runs before each socket connection is established.
-   * Verifies the JWT token using Clerk's verification service.
-   * If valid, attaches the userId to the socket for later use.
-   * If invalid, rejects the connection.
-   */
+ 
   io.use(async (socket, next) => {
     const token = getToken(socket);
     if (!token) return next(new Error('Authentication required'));
@@ -138,23 +66,9 @@ export function setupSignaling(httpServer) {
     }
   });
 
-  /**
-   * Connection Event Handler
-   * 
-   * Fired when a new client successfully connects (after authentication).
-   * Registers all event listeners for this specific socket connection.
-   */
+  // Handle socket connections and events
   io.on('connection', (socket) => {
-    /**
-     * Join Room Event
-     * 
-     * Handles room joining logic with two different paths:
-     * 1. Room Owner: Immediately joins the room and receives any pending requests
-     * 2. Regular User: Added to lobby and must wait for owner approval
-     * 
-     * @param {string} roomId - The ID of the room to join
-     * @param {string} displayName - Optional display name for the user
-     */
+    
     socket.on('join-room', async (roomId, displayName) => {
       if (!roomId) return;
       // Store display name on socket for later use
@@ -212,16 +126,6 @@ export function setupSignaling(httpServer) {
       }
     });
 
-    /**
-     * Accept Join Request Event
-     * 
-     * Allows the room owner to approve a pending join request.
-     * When accepted, the requesting user is moved from lobby to the room.
-     * 
-     * Security: Only the room owner can accept join requests.
-     * 
-     * @param {string} requestingSocketId - Socket ID of the user requesting to join
-     */
     socket.on('accept-join', async (requestingSocketId) => {
       const roomId = socket.roomId;
       if (!roomId) return;
@@ -258,16 +162,6 @@ export function setupSignaling(httpServer) {
       targetSocket.emit('room-joined', { roomId, isOwner: false });
     });
 
-    /**
-     * Reject Join Request Event
-     * 
-     * Allows the room owner to reject a pending join request.
-     * The requesting user is removed from the lobby and notified.
-     * 
-     * Security: Only the room owner can reject join requests.
-     * 
-     * @param {string} requestingSocketId - Socket ID of the user to reject
-     */
     socket.on('reject-join', async (requestingSocketId) => {
       const roomId = socket.roomId;
       if (!roomId) return;
@@ -280,16 +174,7 @@ export function setupSignaling(httpServer) {
       io.to(requestingSocketId).emit('join-rejected');
     });
 
-    /**
-     * Kick User Event
-     * 
-     * Allows the room owner to forcibly remove a user from the room.
-     * The kicked user is disconnected from the room and notified.
-     * 
-     * Security: Only the room owner can kick users.
-     * 
-     * @param {string} targetSocketId - Socket ID of the user to kick
-     */
+  
     socket.on('kick-user', async (targetSocketId) => {
       const roomId = socket.roomId;
       if (!roomId) return;
@@ -314,72 +199,29 @@ export function setupSignaling(httpServer) {
       }
     });
 
-    /**
-     * Get Pending Requests Event
-     * 
-     * Returns all pending join requests for the current room.
-     * Used by room owners to see who is waiting to join.
-     * 
-     * @param {Function} cb - Callback function to return the pending requests array
-     */
+    
     socket.on('get-pending-requests', (cb) => {
       const roomId = socket.roomId;
       if (!roomId) return cb?.([]);
       cb?.(getPendingForRoom(roomId));
     });
 
-    /**
-     * WebRTC Offer Event
-     * 
-     * Forwards WebRTC offer SDP (Session Description Protocol) from one peer to another.
-     * This is part of the WebRTC signaling process to establish peer-to-peer connections.
-     * 
-     * @param {Object} data - Offer data
-     * @param {string} data.to - Socket ID of the target peer
-     * @param {RTCSessionDescriptionInit} data.sdp - SDP offer object
-     */
+
     socket.on('offer', ({ to, sdp }) => {
       if (to) io.to(to).emit('offer', { from: socket.id, sdp });
     });
 
-    /**
-     * WebRTC Answer Event
-     * 
-     * Forwards WebRTC answer SDP from one peer to another.
-     * Sent in response to an offer to complete the WebRTC handshake.
-     * 
-     * @param {Object} data - Answer data
-     * @param {string} data.to - Socket ID of the target peer
-     * @param {RTCSessionDescriptionInit} data.sdp - SDP answer object
-     */
+    
     socket.on('answer', ({ to, sdp }) => {
       if (to) io.to(to).emit('answer', { from: socket.id, sdp });
     });
 
-    /**
-     * ICE Candidate Event
-     * 
-     * Forwards ICE (Interactive Connectivity Establishment) candidates between peers.
-     * ICE candidates are used to establish the best network path for peer-to-peer communication,
-     * handling NAT traversal and firewall issues.
-     * 
-     * @param {Object} data - ICE candidate data
-     * @param {string} data.to - Socket ID of the target peer
-     * @param {RTCIceCandidateInit} data.candidate - ICE candidate object
-     */
+    
     socket.on('ice-candidate', ({ to, candidate }) => {
       if (to) io.to(to).emit('ice-candidate', { from: socket.id, candidate });
     });
 
-    /**
-     * Get Participants Event
-     * 
-     * Returns a list of all participants currently in a room.
-     * Used to discover other users in the room for establishing WebRTC connections.
-     * 
-     * @param {string} roomId - The ID of the room to get participants from
-     * @param {Function} cb - Callback function to return the participants array
-     */
+    
     socket.on('get-participants', (roomId, cb) => {
       const room = roomId ? io.sockets.adapter.rooms.get(roomId) : null;
       if (!room) return cb?.([]);
@@ -397,15 +239,7 @@ export function setupSignaling(httpServer) {
       cb?.(participants);
     });
 
-    /**
-     * Disconnect Event
-     * 
-     * Handles cleanup when a socket disconnects:
-     * - Removes user from lobby if they were waiting
-     * - Notifies room participants that user left
-     * 
-     * This ensures the room state stays consistent when users disconnect unexpectedly.
-     */
+    
     socket.on('disconnect', () => {
       // Remove from lobby if they were waiting for approval
       removeFromLobby(socket.roomId, socket.id);
