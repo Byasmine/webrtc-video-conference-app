@@ -1,0 +1,70 @@
+@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+/* Tailwind v4: class-based dark variant (triggered by .dark on html) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-brand: #3067ff;
+  --color-brand-light: #5a8aff;
+  --color-brand-dark: #1b4fd4;
+  --color-surface-900: #f8f9fa;
+  --color-surface-800: #ffffff;
+  --color-surface-700: #eef0f2;
+  --color-surface-600: #e0e3e7;
+  --color-surface-500: #cfd3d9;
+  --color-surface-400: #6b7280;
+  --color-surface-border: #e5e7eb;
+  --font-family-heading: "Hanken Grotesk", system-ui, sans-serif;
+  --font-family-body: "Inter", system-ui, sans-serif;
+}
+
+/* Light mode (default) - DulfiTech on light - variables inherited from @theme */
+:root {
+  --color-text-primary: #0b0c0c;
+  --color-text-secondary: #4b5563;
+  --color-text-muted: #9ca3af;
+  color-scheme: light;
+}
+
+/* Dark mode - when .dark is on html */
+.dark {
+  --color-surface-900: #0b0c0c;
+  --color-surface-800: #141515;
+  --color-surface-700: #1e1f1f;
+  --color-surface-600: #242627;
+  --color-surface-500: #2e3032;
+  --color-surface-400: #3f444b;
+  --color-surface-border: #5e5a5a6e;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: rgba(255, 255, 255, 0.8);
+  --color-text-muted: rgba(255, 255, 255, 0.5);
+  color-scheme: dark;
+}
+
+:root {
+  font-family: var(--font-family-body);
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-900);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-family-heading);
+}
+
+/* Theme-aware text utilities */
+.text-primary { color: var(--color-text-primary); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-muted { color: var(--color-text-muted); }
